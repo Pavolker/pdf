@@ -1,0 +1,5 @@
+{
+  "name": "PDF Page Remover",
+  "description": "A minimalist tool to visualize and remove specific pages from PDF documents securely in your browser.",
+  "requestFramePermissions": []
+}
