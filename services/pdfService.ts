@@ -68,6 +68,26 @@ export const removePagesAndSave = async (originalFile: File, pageIndicesToRemove
   return pdfBytes;
 };
 
+export const extractPagesAndSave = async (originalFile: File, pageIndicesToExtract: number[]): Promise<Uint8Array> => {
+  const arrayBuffer = await originalFile.arrayBuffer();
+  const pdfDoc = await PDFDocument.load(arrayBuffer);
+  
+  // Create a new PDF document
+  const newPdfDoc = await PDFDocument.create();
+  
+  // Sort indices to maintain page order
+  const sortedIndices = [...pageIndicesToExtract].sort((a, b) => a - b);
+  
+  // Copy selected pages to new document
+  for (const idx of sortedIndices) {
+    const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [idx]);
+    newPdfDoc.addPage(copiedPage);
+  }
+
+  const pdfBytes = await newPdfDoc.save();
+  return pdfBytes;
+};
+
 export const downloadBlob = (data: Uint8Array, filename: string) => {
   const fullFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
   const blob = new Blob([data], { type: 'application/pdf' });
@@ -114,4 +134,19 @@ export const writePdfToHandle = async (handle: any, data: Uint8Array) => {
   const writable = await handle.createWritable();
   await writable.write(data);
   await writable.close();
+};
+
+// Merge multiple PDF files into one
+export const mergePdfs = async (files: File[]): Promise<Uint8Array> => {
+  const mergedPdf = await PDFDocument.create();
+  
+  for (const file of files) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await PDFDocument.load(arrayBuffer);
+    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+    copiedPages.forEach((page) => mergedPdf.addPage(page));
+  }
+  
+  const pdfBytes = await mergedPdf.save();
+  return pdfBytes;
 };

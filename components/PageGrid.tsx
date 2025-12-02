@@ -1,14 +1,15 @@
 import React from 'react';
-import { Check, Trash2 } from 'lucide-react';
+import { Check, Trash2, FileOutput } from 'lucide-react';
 import type { PageThumbnail } from '../services/pdfService';
 
 interface PageGridProps {
   thumbnails: PageThumbnail[];
   selectedIndices: Set<number>;
   onTogglePage: (index: number, event: React.MouseEvent) => void;
+  mode?: 'select' | 'remove' | 'extract';
 }
 
-const PageGrid: React.FC<PageGridProps> = ({ thumbnails, selectedIndices, onTogglePage }) => {
+const PageGrid: React.FC<PageGridProps> = ({ thumbnails, selectedIndices, onTogglePage, mode = 'select' }) => {
   return (
     <div className="w-full animate-fade-in-up">
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">

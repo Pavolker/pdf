@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Trash2, Download, RefreshCw, X, FileEdit, FolderInput } from 'lucide-react';
+import { Trash2, Download, RefreshCw, X, FileEdit, FolderInput, FileOutput, Scissors, Combine } from 'lucide-react';
 import FileUpload from './components/FileUpload';
 import PageGrid from './components/PageGrid';
+import PdfMerger from './components/PdfMerger';
 import {
   generateThumbnails,
   removePagesAndSave,
+  extractPagesAndSave,
   downloadBlob,
   getSaveFileHandle,
   writePdfToHandle,
@@ -12,13 +14,17 @@ import {
   PageThumbnail
 } from './services/pdfService';
 
+type AppMode = 'edit' | 'merge';
+
 const App: React.FC = () => {
+  const [appMode, setAppMode] = useState<AppMode>('edit');
   const [file, setFile] = useState<File | null>(null);
   const [thumbnails, setThumbnails] = useState<PageThumbnail[]>([]);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [operationMode, setOperationMode] = useState<'remove' | 'extract'>('remove');
 
   // Save Modal State
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -28,6 +34,7 @@ const App: React.FC = () => {
     setFile(uploadedFile);
     setIsProcessing(true);
     setLoadingProgress(0);
+    setOperationMode('remove'); // Reset to default
     // Pre-fill filename: remove extension and add suffix
     const baseName = uploadedFile.name.replace(/\.pdf$/i, '');
     setOutputFilename(`${baseName}_editado`);
@@ -72,8 +79,15 @@ const App: React.FC = () => {
     }
   }, [lastSelectedIndex]);
 
-  const openSaveModal = () => {
+  const openSaveModal = (mode: 'remove' | 'extract') => {
     if (!file || selectedIndices.size === 0) return;
+    setOperationMode(mode);
+    
+    // Update filename based on mode
+    const baseName = file.name.replace(/\.pdf$/i, '');
+    const suffix = mode === 'extract' ? '_extraido' : '_editado';
+    setOutputFilename(`${baseName}${suffix}`);
+    
     setShowSaveModal(true);
   };
 
@@ -104,7 +118,9 @@ const App: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      const newPdfBytes = await removePagesAndSave(file, Array.from(selectedIndices));
+      const newPdfBytes = operationMode === 'extract'
+        ? await extractPagesAndSave(file, Array.from(selectedIndices))
+        : await removePagesAndSave(file, Array.from(selectedIndices));
 
       if (fileHandle) {
         await writePdfToHandle(fileHandle, newPdfBytes);
@@ -127,21 +143,55 @@ const App: React.FC = () => {
     setLoadingProgress(0);
     setShowSaveModal(false);
     setOutputFilename('');
+    setOperationMode('remove');
+  };
+
+  const switchMode = (mode: AppMode) => {
+    resetApp();
+    setAppMode(mode);
   };
 
   return (
     <div className="min-h-screen pb-20 relative">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-center relative">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <img src="/centauro.jpg" alt="Logo Centauro" className="h-12 object-contain" />
             <h1 className="text-lg font-semibold tracking-tight text-slate-900">Ferramenta de Gestão de PDF - MDH</h1>
             <img src="/original-maior-.gif" alt="Logo Original" className="h-12 object-contain" />
           </div>
 
-          {file && !isProcessing && (
-            <div className="absolute right-4">
+          {/* Mode Selector */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => switchMode('edit')}
+              className={`
+                flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all
+                ${appMode === 'edit' 
+                  ? 'bg-slate-900 text-white shadow-lg' 
+                  : 'text-slate-600 hover:bg-slate-100'}
+              `}
+            >
+              <Scissors className="w-4 h-4" />
+              Editar
+            </button>
+            <button
+              onClick={() => switchMode('merge')}
+              className={`
+                flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all
+                ${appMode === 'merge' 
+                  ? 'bg-slate-900 text-white shadow-lg' 
+                  : 'text-slate-600 hover:bg-slate-100'}
+              `}
+            >
+              <Combine className="w-4 h-4" />
+              Mesclar
+            </button>
+          </div>
+
+          {file && !isProcessing && appMode === 'edit' && (
+            <div>
               <button
                 onClick={resetApp}
                 className="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors flex items-center"
@@ -156,14 +206,16 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {!file ? (
+        {appMode === 'merge' ? (
+          <PdfMerger />
+        ) : !file ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
             <div className="text-center mb-10 max-w-lg">
               <h2 className="text-4xl font-bold text-slate-900 tracking-tight mb-4">
-                Remova páginas do seu PDF
+                Gerencie páginas do seu PDF
               </h2>
               <p className="text-lg text-slate-500 leading-relaxed">
-                Simples, rápido e direto no seu navegador. Seus arquivos não são enviados para nenhum servidor.
+                Remova ou extraia páginas específicas. Simples, rápido e direto no seu navegador. Seus arquivos não são enviados para nenhum servidor.
               </p>
             </div>
             <FileUpload onFileSelect={handleFileSelect} isProcessing={isProcessing} />
@@ -191,7 +243,7 @@ const App: React.FC = () => {
                   {file.name}
                 </h3>
                 <p className="text-sm text-slate-500">
-                  {thumbnails.length} páginas • {selectedIndices.size} selecionadas para remoção
+                  {thumbnails.length} páginas • {selectedIndices.size} selecionada{selectedIndices.size !== 1 ? 's' : ''}
                 </p>
               </div>
 
@@ -212,6 +264,7 @@ const App: React.FC = () => {
                   thumbnails={thumbnails}
                   selectedIndices={selectedIndices}
                   onTogglePage={togglePageSelection}
+                  mode="select"
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">
@@ -229,8 +282,14 @@ const App: React.FC = () => {
           <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl scale-100 animate-scale-in">
             <div className="flex justify-between items-start mb-6">
               <div>
-                <h3 className="text-xl font-bold text-slate-900">Salvar Arquivo</h3>
-                <p className="text-slate-500 text-sm mt-1">Defina o nome e o local para salvar.</p>
+                <h3 className="text-xl font-bold text-slate-900">
+                  {operationMode === 'extract' ? 'Extrair Páginas' : 'Remover Páginas'}
+                </h3>
+                <p className="text-slate-500 text-sm mt-1">
+                  {operationMode === 'extract' 
+                    ? `Salvar ${selectedIndices.size} página${selectedIndices.size !== 1 ? 's' : ''} em novo arquivo`
+                    : 'Defina o nome e o local para salvar.'}
+                </p>
               </div>
               <button
                 onClick={() => setShowSaveModal(false)}
@@ -288,33 +347,61 @@ const App: React.FC = () => {
       )}
 
       {/* Floating Action Bar */}
-      {file && selectedIndices.size > 0 && !showSaveModal && (
+      {file && selectedIndices.size > 0 && !showSaveModal && appMode === 'edit' && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 animate-slide-up">
-          <button
-            onClick={openSaveModal}
-            disabled={isProcessing}
-            className={`
-              flex items-center space-x-3 px-8 py-4 rounded-full shadow-2xl font-semibold text-white transition-all transform hover:-translate-y-1 active:translate-y-0
-              ${isProcessing ? 'bg-slate-800 cursor-wait' : 'bg-slate-900 hover:bg-slate-800 hover:shadow-rose-900/20'}
-            `}
-          >
-            {isProcessing ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Processando...</span>
-              </>
-            ) : (
-              <>
-                <div className="relative">
-                  <Trash2 className="w-5 h-5" />
-                  <span className="absolute -top-2 -right-2 bg-rose-500 text-[10px] w-4 h-4 flex items-center justify-center rounded-full border border-slate-900">
-                    {selectedIndices.size}
-                  </span>
-                </div>
-                <span>Continuar</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => openSaveModal('remove')}
+              disabled={isProcessing}
+              className={`
+                flex items-center space-x-3 px-6 py-4 rounded-full shadow-2xl font-semibold text-white transition-all transform hover:-translate-y-1 active:translate-y-0
+                ${isProcessing ? 'bg-slate-800 cursor-wait' : 'bg-rose-600 hover:bg-rose-700'}
+              `}
+            >
+              {isProcessing ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Processando...</span>
+                </>
+              ) : (
+                <>
+                  <div className="relative">
+                    <Trash2 className="w-5 h-5" />
+                    <span className="absolute -top-2 -right-2 bg-white text-rose-600 text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold">
+                      {selectedIndices.size}
+                    </span>
+                  </div>
+                  <span>Remover</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => openSaveModal('extract')}
+              disabled={isProcessing}
+              className={`
+                flex items-center space-x-3 px-6 py-4 rounded-full shadow-2xl font-semibold text-white transition-all transform hover:-translate-y-1 active:translate-y-0
+                ${isProcessing ? 'bg-slate-800 cursor-wait' : 'bg-emerald-600 hover:bg-emerald-700'}
+              `}
+            >
+              {isProcessing ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Processando...</span>
+                </>
+              ) : (
+                <>
+                  <div className="relative">
+                    <FileOutput className="w-5 h-5" />
+                    <span className="absolute -top-2 -right-2 bg-white text-emerald-600 text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold">
+                      {selectedIndices.size}
+                    </span>
+                  </div>
+                  <span>Extrair</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
     </div>
