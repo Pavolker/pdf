@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Trash2, Download, RefreshCw, X, FileEdit, FolderInput, FileOutput, Scissors, Combine } from 'lucide-react';
+import { Trash2, Download, RefreshCw, X, FileEdit, FolderInput, FileOutput, Scissors, Combine, RefreshCcw } from 'lucide-react';
 import FileUpload from './components/FileUpload';
 import PageGrid from './components/PageGrid';
 import PdfMerger from './components/PdfMerger';
+import FileConverter from './components/FileConverter';
 import {
   generateThumbnails,
   removePagesAndSave,
@@ -14,7 +15,7 @@ import {
   PageThumbnail
 } from './services/pdfService';
 
-type AppMode = 'edit' | 'merge';
+type AppMode = 'edit' | 'merge' | 'convert';
 
 const App: React.FC = () => {
   const [appMode, setAppMode] = useState<AppMode>('edit');
@@ -188,6 +189,18 @@ const App: React.FC = () => {
               <Combine className="w-4 h-4" />
               Mesclar
             </button>
+            <button
+              onClick={() => switchMode('convert')}
+              className={`
+                flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all
+                ${appMode === 'convert' 
+                  ? 'bg-slate-900 text-white shadow-lg' 
+                  : 'text-slate-600 hover:bg-slate-100'}
+              `}
+            >
+              <RefreshCcw className="w-4 h-4" />
+              Converter
+            </button>
           </div>
 
           {file && !isProcessing && appMode === 'edit' && (
@@ -206,7 +219,9 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {appMode === 'merge' ? (
+        {appMode === 'convert' ? (
+          <FileConverter />
+        ) : appMode === 'merge' ? (
           <PdfMerger />
         ) : !file ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
@@ -404,6 +419,15 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Footer */}
+      <footer className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t border-slate-200 py-3 z-20">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <p className="text-xs text-slate-600">
+            @Copywriter - 2025 - MDH - Versão 1.0 - Desenvolvido por Pvolker
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };
