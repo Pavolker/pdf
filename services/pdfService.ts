@@ -1,8 +1,9 @@
-import { getDocument, GlobalWorkerOptions, version } from 'pdfjs-dist';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import { PDFDocument } from 'pdf-lib';
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// Configure the worker for PDF.js
-GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.mjs`;
+// Configure the worker for PDF.js (use local bundler URL to avoid CORS/module issues)
+GlobalWorkerOptions.workerSrc = workerSrc;
 
 export interface PageThumbnail {
   index: number;
